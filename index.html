@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Teleprompter</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .app-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* SETTINGS SCREEN */
+        #settingsScreen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #111;
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+            padding: 10px;
+        }
+
+        #settingsScreen h1 {
+            margin: 10px 0;
+            font-size: 1.5em;
+            color: #fff;
+        }
+
+        #scriptInput {
+            width: 90%;
+            height: 150px;
+            margin: 10px 0;
+            font-size: 1em;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            resize: none;
+            background: #fff;
+            color: #000;
+        }
+
+        .checkbox-group {
+            margin: 10px 0;
+        }
+
+        .checkbox-group label {
+            margin-right: 10px;
+        }
+
+        .settings-row {
+            margin: 10px 0;
+            color: #fff;
+        }
+
+        .settings-row label {
+            margin-right: 10px;
+        }
+
+        .settings-row input[type="number"] {
+            width: 60px;
+            margin-left: 5px;
+        }
+
+        #startButton {
+            background: #28a745;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1.1em;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        #startButton:hover {
+            background: #218838;
+        }
+
+        /* TELEPROMPTER SCREEN */
+        #teleprompterScreen {
+            display: none;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            position: relative;
+            transform: rotateY(180deg);
+        }
+
+        #scrollWrap {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #scrollContainer {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            text-align: center;
+            line-height: 1.5;
+            /* Add some padding so words aren't flush against the edge */
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        #scrollContainer b {
+            font-weight: bold;
+            color: #ff0; /* highlight color */
+        }
+
+        /* Control Panel Overlay (compact, black background) */
+        #controlPanel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: #000;
+            padding: 3px 5px;
+            border-radius: 3px;
+            z-index: 9999;
+            pointer-events: auto;
+            font-size: 0.9em;
+            border: 1px solid #333;
+        }
+
+        #controlPanel button {
+            background: #222;
+            color: #fff;
+            border: 1px solid #444;
+            margin: 0 2px;
+            padding: 3px 5px;
+            font-size: 0.9em;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+
+        #controlPanel button:hover {
+            background: #333;
+        }
+
+        #controlPanel input[type="number"] {
+            width: 40px;
+            margin: 0 2px;
+            font-size: 0.9em;
+            padding: 2px;
+            border-radius: 2px;
+            border: 1px solid #444;
+            color: #000;
+        }
+
+        #backToSettings {
+            background: #d9534f;
+        }
+
+        #backToSettings:hover {
+            background: #c9302c;
+        }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <!-- SETTINGS SCREEN -->
+    <div id="settingsScreen">
+        <h1>Teleprompter Settings</h1>
+        <textarea id="scriptInput" placeholder="Paste your script here..."></textarea>
+
+        <div class="checkbox-group">
+            <label><input type="checkbox" id="highlightNouns" checked> Highlight Nouns</label>
+            <label><input type="checkbox" id="highlightVerbs" checked> Highlight Verbs</label>
+            <label><input type="checkbox" id="highlightAdjectives" checked> Highlight Adjectives/Adverbs</label>
+        </div>
+
+        <div class="settings-row">
+            <label>Font Size (px): <input type="number" id="fontSize" value="24"></label>
+        </div>
+        <div class="settings-row">
+            <label>Scroll Speed (px/sec): <input type="number" id="scrollSpeed" value="30"></label>
+            <!-- Scroll Speed is irrelevant now, but let's keep it hidden or remove it entirely -->
+            <!-- We'll remove it since we no longer have auto scroll -->
+        </div>
+        <button id="startButton">Start Teleprompter</button>
+    </div>
+
+    <!-- TELEPROMPTER SCREEN -->
+    <div id="teleprompterScreen">
+        <div id="controlPanel">
+            <!-- Removed speed and pause controls, only text size remains -->
+            <label>Sz:<input type="number" id="sizeControl" value="24"></label>
+            <button id="applyChangesBtn">Apply</button>
+            <button id="backToSettings">Back</button>
+        </div>
+        <div id="scrollWrap">
+            <div id="scrollContainer"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Compromise NLP Library -->
+<script src="https://cdn.jsdelivr.net/npm/compromise@13.11.4/builds/compromise.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const settingsScreen = document.getElementById("settingsScreen");
+    const teleprompterScreen = document.getElementById("teleprompterScreen");
+    const scriptInput = document.getElementById("scriptInput");
+
+    const highlightNounsEl = document.getElementById("highlightNouns");
+    const highlightVerbsEl = document.getElementById("highlightVerbs");
+    const highlightAdjectivesEl = document.getElementById("highlightAdjectives");
+
+    const fontSizeInput = document.getElementById("fontSize");
+    const startButton = document.getElementById("startButton");
+
+    const scrollContainer = document.getElementById("scrollContainer");
+    const sizeControl = document.getElementById("sizeControl");
+    const applyChangesBtn = document.getElementById("applyChangesBtn");
+    const backToSettingsBtn = document.getElementById("backToSettings");
+    const teleprompterScreenEl = document.getElementById("teleprompterScreen");
+
+    let currentFontSize = 24;
+    let currentTop = 0; // Track the current top offset of scrollContainer
+    const wheelStep = 20; // pixels per wheel event
+
+    // Highlight words in place while preserving formatting
+    function highlightText(text, highlightNouns, highlightVerbs, highlightAdjs) {
+        const doc = nlp(text);
+
+        const nouns = highlightNouns ? new Set(doc.nouns().out('array').map(w => w.toLowerCase())) : new Set();
+        const verbs = highlightVerbs ? new Set(doc.verbs().out('array').map(w => w.toLowerCase())) : new Set();
+        const adjectives = highlightAdjs ? new Set(doc.adjectives().out('array').map(w => w.toLowerCase())) : new Set();
+        const adverbs = highlightAdjs ? new Set(doc.adverbs().out('array').map(w => w.toLowerCase())) : new Set();
+
+        return text.replace(/\w+/g, (match) => {
+            const lower = match.toLowerCase();
+            if (nouns.has(lower) || verbs.has(lower) || adjectives.has(lower) || adverbs.has(lower)) {
+                return `<b>${match}</b>`;
+            } else {
+                return match;
+            }
+        });
+    }
+
+    // Start Teleprompter
+    startButton.addEventListener("click", () => {
+        const text = scriptInput.value.trim();
+        if (!text) return;
+
+        const hNouns = highlightNounsEl.checked;
+        const hVerbs = highlightVerbsEl.checked;
+        const hAdjs = highlightAdjectivesEl.checked;
+        currentFontSize = parseFloat(fontSizeInput.value) || 24;
+
+        // Highlight the text
+        const highlightedText = highlightText(text, hNouns, hVerbs, hAdjs);
+        scrollContainer.innerHTML = highlightedText;
+        scrollContainer.style.fontSize = currentFontSize + "px";
+
+        // Switch screens
+        settingsScreen.style.display = "none";
+        teleprompterScreen.style.display = "block";
+
+        currentTop = 0;
+        scrollContainer.style.top = currentTop + "px";
+
+        // Set size control to current font size
+        sizeControl.value = currentFontSize;
+    });
+
+    applyChangesBtn.addEventListener("click", () => {
+        const newSize = parseFloat(sizeControl.value) || currentFontSize;
+        currentFontSize = newSize;
+        scrollContainer.style.fontSize = currentFontSize + "px";
+    });
+
+    backToSettingsBtn.addEventListener("click", () => {
+        // Return to settings
+        teleprompterScreen.style.display = "none";
+        settingsScreen.style.display = "flex";
+
+        currentTop = 0;
+        scrollContainer.style.top = "0px";
+    });
+
+    // Handle keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        if (teleprompterScreenEl.style.display !== 'block') return;
+
+        // Page Up/Down to scroll a full page
+        const teleprompterHeight = teleprompterScreenEl.clientHeight;
+
+        if (e.key === 'PageDown') {
+            // Move one page forward (text goes up)
+            currentTop -= teleprompterHeight;
+            scrollContainer.style.top = currentTop + "px";
+        } else if (e.key === 'PageUp') {
+            // Move one page back (text goes down), ensure we don't go past the start
+            currentTop = Math.min(currentTop + teleprompterHeight, 0);
+            scrollContainer.style.top = currentTop + "px";
+        }
+    });
+
+    // Handle mouse wheel scrolling
+    teleprompterScreenEl.addEventListener('wheel', (e) => {
+        if (teleprompterScreenEl.style.display !== 'block') return;
+        e.preventDefault(); // Prevent default page scroll
+
+        if (e.deltaY > 0) {
+            // Scrolling down moves text upward
+            currentTop -= wheelStep;
+        } else {
+            // Scrolling up moves text downward, don't go past top
+            currentTop = Math.min(currentTop + wheelStep, 0);
+        }
+
+        scrollContainer.style.top = currentTop + "px";
+    }, { passive: false });
+});
+</script>
+</body>
+</html>
