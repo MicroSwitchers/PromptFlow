@@ -56,6 +56,7 @@
 
         .checkbox-group label {
             margin-right: 10px;
+            color: #fff;
         }
 
         .settings-row {
@@ -70,6 +71,20 @@
         .settings-row input[type="number"] {
             width: 60px;
             margin-left: 5px;
+        }
+
+        #dummySettings {
+            display: none;
+            margin: 10px 0;
+            color: #fff;
+        }
+
+        #dummySettings label {
+            margin-right: 10px;
+        }
+
+        #dummyParagraphs {
+            width: 60px;
         }
 
         #startButton {
@@ -109,8 +124,7 @@
             width: 100%;
             text-align: center;
             line-height: 1.5;
-            /* Add some padding so words aren't flush against the edge */
-            padding: 10px;
+            padding: 10px; /* padding to ensure text doesn't hit edges */
             box-sizing: border-box;
         }
 
@@ -180,13 +194,16 @@
             <label><input type="checkbox" id="highlightAdjectives" checked> Highlight Adjectives/Adverbs</label>
         </div>
 
+        <div class="checkbox-group">
+            <label><input type="checkbox" id="useDummyText"> Use Dummy Text?</label>
+        </div>
+
+        <div id="dummySettings">
+            <label>Dummy Length (paragraphs): <input type="number" id="dummyParagraphs" value="2" min="1"></label>
+        </div>
+
         <div class="settings-row">
             <label>Font Size (px): <input type="number" id="fontSize" value="24"></label>
-        </div>
-        <div class="settings-row">
-            <label>Scroll Speed (px/sec): <input type="number" id="scrollSpeed" value="30"></label>
-            <!-- Scroll Speed is irrelevant now, but let's keep it hidden or remove it entirely -->
-            <!-- We'll remove it since we no longer have auto scroll -->
         </div>
         <button id="startButton">Start Teleprompter</button>
     </div>
@@ -194,7 +211,6 @@
     <!-- TELEPROMPTER SCREEN -->
     <div id="teleprompterScreen">
         <div id="controlPanel">
-            <!-- Removed speed and pause controls, only text size remains -->
             <label>Sz:<input type="number" id="sizeControl" value="24"></label>
             <button id="applyChangesBtn">Apply</button>
             <button id="backToSettings">Back</button>
@@ -216,6 +232,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const highlightNounsEl = document.getElementById("highlightNouns");
     const highlightVerbsEl = document.getElementById("highlightVerbs");
     const highlightAdjectivesEl = document.getElementById("highlightAdjectives");
+    const useDummyTextEl = document.getElementById("useDummyText");
+    const dummySettingsEl = document.getElementById("dummySettings");
+    const dummyParagraphsEl = document.getElementById("dummyParagraphs");
 
     const fontSizeInput = document.getElementById("fontSize");
     const startButton = document.getElementById("startButton");
@@ -226,9 +245,40 @@ document.addEventListener('DOMContentLoaded', () => {
     const backToSettingsBtn = document.getElementById("backToSettings");
     const teleprompterScreenEl = document.getElementById("teleprompterScreen");
 
+    const wheelStep = 20; // pixels per wheel event
     let currentFontSize = 24;
     let currentTop = 0; // Track the current top offset of scrollContainer
-    const wheelStep = 20; // pixels per wheel event
+
+    const dummyTextParagraph = `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque a enim at velit sagittis ultricies. Suspendisse potenti. Etiam in erat at leo varius viverra. Donec mattis pulvinar neque, in vulputate mauris aliquam ac. Cras pellentesque malesuada massa, a tincidunt quam blandit vitae. Curabitur vel felis placerat, placerat lectus vitae, egestas magna. Integer in mattis lorem, at feugiat felis. Morbi fringilla finibus enim, nec auctor nunc interdum non. Nunc bibendum tincidunt risus nec pulvinar. Praesent ac aliquam sem. Sed quis tellus nisl. Quisque vitae varius sapien, at dictum massa.`
+
+    // The dummy text is formed by repeating the paragraph multiple times.
+    function getDummyText(paragraphs) {
+        let textArray = [];
+        for (let i = 0; i < paragraphs; i++) {
+            textArray.push(dummyTextParagraph);
+        }
+        return textArray.join("\n\n");
+    }
+
+    // Handle toggling dummy text
+    useDummyTextEl.addEventListener('change', () => {
+        if (useDummyTextEl.checked) {
+            dummySettingsEl.style.display = "block";
+            scriptInput.disabled = true;
+            scriptInput.value = getDummyText(parseInt(dummyParagraphsEl.value) || 2);
+        } else {
+            dummySettingsEl.style.display = "none";
+            scriptInput.disabled = false;
+            scriptInput.value = "";
+        }
+    });
+
+    dummyParagraphsEl.addEventListener('input', () => {
+        if (useDummyTextEl.checked) {
+            const paragraphs = parseInt(dummyParagraphsEl.value) || 2;
+            scriptInput.value = getDummyText(paragraphs);
+        }
+    });
 
     // Highlight words in place while preserving formatting
     function highlightText(text, highlightNouns, highlightVerbs, highlightAdjs) {
@@ -251,8 +301,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Start Teleprompter
     startButton.addEventListener("click", () => {
-        const text = scriptInput.value.trim();
-        if (!text) return;
+        let text = scriptInput.value.trim();
+        // If dummy text is enabled, we already have text from the dummy feature.
+        // If dummy is off and no text, then return.
+        if (!text && !useDummyTextEl.checked) return;
 
         const hNouns = highlightNounsEl.checked;
         const hVerbs = highlightVerbsEl.checked;
@@ -271,7 +323,6 @@ document.addEventListener('DOMContentLoaded', () => {
         currentTop = 0;
         scrollContainer.style.top = currentTop + "px";
 
-        // Set size control to current font size
         sizeControl.value = currentFontSize;
     });
 
